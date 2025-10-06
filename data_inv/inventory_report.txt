@@ -1,52 +1,41 @@
-Inventory System — Summary Report
-Generated At : 2025-10-01 20:45:05 (+0700)
-App Version  : 1.0
-Endianness   : Little-Endian
-Encoding     : UTF-8 (fixed-length)
+Inventory — Unified Movement Report
+Generated At : 2025-10-03 08:35:55 (+0700)
 
-ItemID | Name                           | Cat          |    Qty |      Price | Record  | Status  
--------------------------------------------------------------------------------------------------
-     1 | Laptop Acer Aspire             | Computers    |     10 |   25000.00 | Active  | available
-     2 | Desktop HP ProDesk             | Computers    |      5 |   32000.00 | Active  | available
-     3 | Monitor 24" IPS                | Computers    |     12 |    4500.00 | Active  | available
-     4 | Office Chair Mesh              | Furniture    |     13 |    4500.00 | Active  | available
-     5 | Standing Desk 120cm            | Furniture    |      8 |   12000.00 | Active  | available
-    15 | Hammer 18                      | Furniture    |      1 |    5000.00 | Active  | available
-     7 | Electric Drill Bosch           | Tools        |      6 |    3500.00 | Active  | available
-     8 | Microwave Sharp 20L            | Appliances   |      3 |    2200.00 | Active  | available
-     9 | A4 Copy Paper 80gsm            | Stationery   |     45 |     120.00 | Active  | available
-    10 | gigabit switch                 | Networking   |      5 |    2000.00 | Active  | available
-    11 | Cat6 Cable 305m                | Networking   |      2 |    2900.00 | Active  | available
-    12 | Old Dell OptiPlex              | Computers    |      0 |    1000.00 | Active  | disposed
-    13 | Office Chair                   | Furniture    |      1 |    3500.00 | Active  | damaged 
-    16 | IPHONE 17 pro                  | Phone        |      1 |   50000.00 | Active  | available
+MoveID | Operator             | Item                     | Category       | Type     | Date       | Qty(±) | Stock After
+------------------------------------------------------------------------------------------------------------------------
+     1 | Somchai              | A4 Copy Paper 80gsm      | Stationery     | issue    | 2025-09-01 |     -5 |          45
+     2 | Anan                 | Laptop Acer Aspire       | Computers      | issue    | 2025-09-02 |     -1 |           9
+     4 | Jiraporn             | Gigabit Switch 16p       | Networking     | transfer | 2025-09-03 |      0 |           5
+     5 | Wipada               | Electric Drill Bosch     | Tools          | repair   | 2025-09-04 |      0 |           6
+     3 | Anan                 | Laptop Acer Aspire       | Computers      | return   | 2025-09-05 |      1 |          10
+     6 | Nok                  | Office Chair Mesh        | Furniture      | issue    | 2025-09-06 |     -3 |          12
+     7 | Nok                  | Office Chair Mesh        | Furniture      | return   | 2025-09-07 |      1 |          13
+     8 | Korn                 | Microwave Sharp 20L      | Appliances     | issue    | 2025-09-08 |     -1 |           3
+     9 | Preecha              | Cat6 Cable 305m          | Networking     | transfer | 2025-09-09 |      0 |           2
+    10 | Arthit               | Hammer 16oz              | Tools          | issue    | 2025-09-10 |    -10 |          20
+    11 | Pooreepat            | Iphone 17                | Phone          | issue    | 2025-10-03 |     -5 |           5
 
-Summary (เฉพาะ Active)
-- Total Items (records) : 14
-- Active Items          : 14
-- Deleted Items         : 0
-- Total Quantity        : 112
-- Total Value           : 725,800.00 THB
+Summary
+- Rows                         : 11
+- Distinct Operators (all)     : 9
+- Issues (ออก)   qty total    : 25  | operators: 6
+- Returns (เข้า) qty total    : 2  | operators: 2
+- Transfers     qty total      : 2  | operators: 2
+- Repairs       qty total      : 1  | operators: 1
 
-Items by Category (Active only)
-- Appliances   : 1 items, qty=3, value=6,600.00 THB
-- Computers    : 4 items, qty=27, value=464,000.00 THB
-- Furniture    : 4 items, qty=23, value=163,000.00 THB
-- Networking   : 2 items, qty=7, value=15,800.00 THB
-- Phone        : 1 items, qty=1, value=50,000.00 THB
-- Stationery   : 1 items, qty=45, value=5,400.00 THB
-- Tools        : 1 items, qty=6, value=21,000.00 THB
-
-Recent Movements (latest 10)
-MoveID | Date       | ItemID | Name                 | Type     |    Qty | By                  
---------------------------------------------------------------------------------------
-    11 | 2025-10-01 |     14 | item#14              | repair   |      2 | Pooreepat           
-    10 | 2025-09-10 |      6 | item#6               | issue    |     10 | Arthit              
-     9 | 2025-09-09 |     11 | Cat6 Cable 305m      | transfer |      1 | Preecha             
-     8 | 2025-09-08 |      8 | Microwave Sharp 20L  | issue    |      1 | Korn                
-     7 | 2025-09-07 |      4 | Office Chair Mesh    | return   |      1 | Nok                 
-     6 | 2025-09-06 |      4 | Office Chair Mesh    | issue    |      3 | Nok                 
-     3 | 2025-09-05 |      1 | Laptop Acer Aspire   | return   |      1 | Anan                
-     5 | 2025-09-04 |      7 | Electric Drill Bosch | repair   |      1 | Wipada              
-     4 | 2025-09-03 |     10 | gigabit switch       | transfer |      1 | Jiraporn            
-     2 | 2025-09-02 |      1 | Laptop Acer Aspire   | issue    |      1 | Anan                
+Ending Stock by Item (from Items table):
+  - Laptop Acer Aspire : 10
+  - Desktop HP ProDesk : 5
+  - Monitor 24" IPS : 12
+  - Office Chair Mesh : 13
+  - Standing Desk 120cm : 8
+  - Hammer 16oz : 20
+  - Electric Drill Bosch : 6
+  - Microwave Sharp 20L : 3
+  - A4 Copy Paper 80gsm : 45
+  - Gigabit Switch 16p : 5
+  - Cat6 Cable 305m : 2
+  - Old Dell OptiPlex : 0
+  - Broken Office Chair : 1
+  - Iphone 17 : 5
+  

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Inventory-BinIO (clean)
 - 3 ไฟล์ไบนารี: categories.bin / items.bin / movements.bin
@@ -502,84 +500,132 @@ class App:
         print(f"Total Qty = {total_qty}")
         print(f"Total Value = {total_value/100:,.2f} THB")
 
-    # ---------- Report ----------
     def generate_report(self, out_path: str):
-        # cache ชื่อหมวด
-        cat_name = {}
+        # --- เตรียม lookup ชื่อหมวด ---
+        cat_name: Dict[int, str] = {}
         for _, raw in self.cats.iter_active():
             c = self.cats.unpack(raw)
             cat_name[c['cat_id']] = c['name'] or f"cat#{c['cat_id']}"
 
-        lines=[]
-        ts=datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S (%z)')
-        lines+=[
-            'Inventory System — Summary Report',
+        # --- เตรียมข้อมูล item และ stock ปัจจุบัน ---
+        item_info: Dict[int, Dict[str, Any]] = {}
+        current_qty: Dict[int, int] = {}
+        for _, raw in self.items.iter_active():
+            it = self.items.unpack(raw)
+            item_info[it['item_id']] = {
+                'name': it['name'],
+                'cat': cat_name.get(it['cat_id'], f"cat#{it['cat_id']}")
+            }
+            current_qty[it['item_id']] = int(it['qty'])
+
+        # --- รวบรวม movements ที่ active ---
+        moves = []
+        for _, raw in self.moves.iter_active():
+            m = self.moves.unpack(raw)
+            moves.append(m)
+
+        # ถ้ายังไม่มี movement เลย
+        if not moves:
+            with open(out_path, 'w', encoding='utf-8') as f:
+                ts = datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S (%z)')
+                f.write('Inventory — Unified Movement Report\n')
+                f.write(f'Generated At : {ts}\n\n')
+                f.write('(no data)\n')
+            print('* เขียนรายงานที่', out_path)
+            return
+
+        # --- คำนวณ net delta ต่อ item (สำหรับหา opening stock) ---
+        net_delta: Dict[int, int] = {}
+        for m in moves:
+            iid = m['item_id']; q = int(m['qty'])
+            if m['type'] == 0:      # issue
+                delta = -q
+            elif m['type'] == 2:    # return
+                delta = q
+            else:
+                delta = 0
+            net_delta[iid] = net_delta.get(iid, 0) + delta
+
+        # opening = current - net_delta
+        opening: Dict[int, int] = {}
+        for iid, cur in current_qty.items():
+            opening[iid] = cur - net_delta.get(iid, 0)
+
+        # --- เรียง movement ตามวันที่ แล้วตาม id ---
+        moves.sort(key=lambda x: (x['ymd'], x['move_id']))
+        running = dict(opening)
+
+        # --- สร้างบรรทัดหัว ---
+        ts = datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S (%z)')
+        lines = [
+            'Inventory — Unified Movement Report',
             f'Generated At : {ts}',
-            'App Version  : 1.0',
-            'Endianness   : Little-Endian',
-            'Encoding     : UTF-8 (fixed-length)',
             ''
         ]
-        th=f"{'ItemID':>6} | {'Name':<30} | {'Cat':<12} | {'Qty':>6} | {'Price':>10} | {'Record':<7} | {'Status':<8}"
-        lines+=[th,'-'*len(th)]
-        total=active=deleted=0
-        total_qty=0; total_val=0
-        by_cat_count: Dict[str,int]={}
-        by_cat_qty: Dict[str,int]={}
-        by_cat_val: Dict[str,int]={}
-        for _,raw in self.items.iter_all():
-            total+=1
-            it=self.items.unpack(raw)
-            is_active=(raw[0]==1)
-            record_state='Active' if is_active else 'Deleted'
-            cat = cat_name.get(it['cat_id'], f"cat#{it['cat_id']}")
-            lines.append(f"{it['item_id']:>6} | {it['name']:<30.30} | {cat:<12.12} | "
-                         f"{it['qty']:>6} | {it['price_cents']/100:>10.2f} | {record_state:<7} | {ITEM_STATUS[it['status']]:<8}")
-            if is_active:
-                active+=1
-                total_qty += it['qty']
-                total_val += it['qty'] * it['price_cents']
-                by_cat_count[cat]=by_cat_count.get(cat,0)+1
-                by_cat_qty[cat]=by_cat_qty.get(cat,0)+it['qty']
-                by_cat_val[cat]=by_cat_val.get(cat,0)+it['qty']*it['price_cents']
-        deleted=total-active
-        lines+=['',
-                'Summary (เฉพาะ Active)',
-                f'- Total Items (records) : {total}',
-                f'- Active Items          : {active}',
-                f'- Deleted Items         : {deleted}',
-                f'- Total Quantity        : {total_qty}',
-                f'- Total Value           : {total_val/100:,.2f} THB',
-                '']
-        # แจกแจงตามหมวด
-        lines.append('Items by Category (Active only)')
-        if by_cat_count:
-            for cat in sorted(by_cat_count):
-                lines.append(f"- {cat:<12} : {by_cat_count[cat]} items, qty={by_cat_qty[cat]}, value={by_cat_val[cat]/100:,.2f} THB")
+        th = (f"{'MoveID':>6} | {'Operator':<20} | {'Item':<24} | "
+              f"{'Category':<14} | {'Type':<8} | {'Date':<10} | {'Qty(±)':>6} | {'Stock After':>11}")
+        lines += [th, '-' * len(th)]
+
+        # ตัวแปรสรุป
+        totals_by_type = {0: 0, 1: 0, 2: 0, 3: 0}     # รวมปริมาณต่อประเภท (ใช้ปริมาณจริง ไม่ใส่เครื่องหมาย)
+        operators_all = set()
+        operators_by_type = {0: set(), 1: set(), 2: set(), 3: set()}
+        rows = 0
+
+        # --- เติมตารางหลัก พร้อมคำนวณ Stock After ---
+        for m in moves:
+            iid = m['item_id']
+            it = item_info.get(iid, {'name': f"item#{iid}", 'cat': '(unknown)'})
+            item_nm = it['name']; cat_nm = it['cat']
+            tname = MOVE_TYPE.get(m['type'], f"type#{m['type']}")
+            ymd_str = int_to_ymd(m['ymd'])
+
+            # ปรับเครื่องหมาย qty สำหรับคลังกลาง
+            if m['type'] == 0:      # issue
+                qty_disp = -int(m['qty'])
+            elif m['type'] == 2:    # return
+                qty_disp = int(m['qty'])
+            else:                   # transfer/repair -> 0
+                qty_disp = 0
+
+            before = running.get(iid, 0)
+            after = before + qty_disp
+            running[iid] = after
+
+            lines.append(
+                f"{m['move_id']:>6} | {m['operator']:<20.20} | {item_nm:<24.24} | "
+                f"{cat_nm:<14.14} | {tname:<8} | {ymd_str:<10} | {qty_disp:>6} | {after:>11}"
+            )
+
+            rows += 1
+            operators_all.add(m['operator'])
+            operators_by_type[m['type']].add(m['operator'])
+            totals_by_type[m['type']] += int(m['qty'])
+
+        # --- สรุปท้ายตาราง ---
+        lines += [
+            '',
+            'Summary'
+        ]
+        lines += [f"- Rows                         : {rows}"]
+        lines += [f"- Distinct Operators (all)     : {len(operators_all)}"]
+        lines += [f"- Issues (ออก)   qty total    : {totals_by_type.get(0,0)}   | operators: {len(operators_by_type.get(0,set()))}"]
+        lines += [f"- Returns (เข้า) qty total      : {totals_by_type.get(2,0)}    | operators: {len(operators_by_type.get(2,set()))}"]
+        lines += [f"- Transfers     qty total      : {totals_by_type.get(1,0)}  | operators: {len(operators_by_type.get(1,set()))}"]
+        lines += [f"- Repairs       qty total      : {totals_by_type.get(3,0)}  | operators: {len(operators_by_type.get(3,set()))}"]
+        lines += ['']
+
+        # แสดง Ending Stock ปัจจุบันจาก items table (ภาพรวมตอนนี้)
+        lines += ['Ending Stock by Item (from Items table):']
+        if current_qty:
+            for iid in sorted(current_qty):
+                nm = item_info.get(iid, {'name': f"item#{iid}"})['name']
+                lines.append(f"  - {nm} : {current_qty[iid]}")
         else:
-            lines.append('(no active items)')
-        # Recent movements (ล่าสุด 10)
-        recents=[]
-        for _,raw in self.moves.iter_active():
-            m=self.moves.unpack(raw); recents.append(m)
-        recents.sort(key=lambda x: (x['ymd'], x['move_id']), reverse=True)
-        lines+=['','Recent Movements (latest 10)']
-        if recents:
-            lines.append(f"{'MoveID':>6} | {'Date':<10} | {'ItemID':>6} | {'Name':<20} | {'Type':<8} | {'Qty':>6} | {'By':<20}")
-            lines.append('-'*86)
-            name_cache={}
-            def item_name(iid:int)->str:
-                if iid in name_cache: return name_cache[iid]
-                raw=self.items.read_record(iid)
-                name_cache[iid]=self.items.unpack(raw)['name'] if raw else f"item#{iid}"
-                return name_cache[iid]
-            for m in recents[:10]:
-                lines.append(f"{m['move_id']:>6} | {int_to_ymd(m['ymd']):<10} | {m['item_id']:>6} | "
-                             f"{item_name(m['item_id']):<20.20} | {MOVE_TYPE[m['type']]:<8} | "
-                             f"{m['qty']:>6} | {m['operator']:<20.20}")
-        else:
-            lines.append('(none)')
-        with open(out_path,'w',encoding='utf-8') as f: f.write('\n'.join(lines)+'\n')
+            lines += ['  (no items)']
+
+        with open(out_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(lines) + '\n')
         print('* เขียนรายงานที่', out_path)
 
     # ---------- Menu ----------
